@@ -157,14 +157,38 @@ network:
           - $DNS2
 EOF
 
-# 6. Apply the config safely using netplan's built-in rollback feature
-echo -e "\n\e[32m[*] Testing the new configuration safely...\e[0m"
-echo -e "\e[33m[Notice] If your connection drops, wait two minutes and the server will roll back automatically.\e[0m"
+# Netplan requires strict permissions on its config files (root-only),
+# otherwise it prints "Permissions too open" warnings.
+chmod 600 /etc/netplan/01-static-managed.yaml
 
-if netplan try --timeout 60; then
-    echo -e "\n\e[32m[OK] Static IP applied and confirmed successfully!\e[0m"
-    echo -e "\e[34mCurrent IP for $IFACE:\e[0m"
-    ip addr show "$IFACE" | grep inet
+# 6. Apply the config, then confirm manually.
+#
+# Note: we deliberately do NOT use "netplan try" here. Its own built-in
+# Enter-key confirmation does not reliably detect keypresses in every
+# terminal type (e.g. some VM consoles), which caused this script to
+# always roll back even after pressing Enter. Instead we apply the
+# config directly and use our own read prompt (which we already know
+# works fine in this script) as the safety confirmation.
+echo -e "\n\e[32m[*] Applying the new network configuration...\e[0m"
+netplan apply
+sleep 2
+
+echo -e "\e[34mCurrent IP for $IFACE:\e[0m"
+ip addr show "$IFACE" | grep inet
+
+echo -e "\n\e[33m[Notice] If you can still reach this machine with the new IP (e.g. via SSH), confirm below.\e[0m"
+echo -e "\e[33m[Notice] If there is no response within 60 seconds, the previous network settings will be restored automatically.\e[0m"
+
+CONFIRM=""
+read -t 60 -r -p "Keep this configuration? [y/N]: " CONFIRM || true
+echo ""
+
+if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo -e "\e[32m[OK] Configuration kept. Static IP setup complete.\e[0m"
 else
-    echo -e "\n\e[31m[-] Changes were rolled back or an error occurred while applying the config.\e[0m"
+    echo -e "\e[33m[*] Rolling back to the previous network configuration...\e[0m"
+    rm -f /etc/netplan/01-static-managed.yaml
+    mv /etc/netplan/backup_old_yaml/*.yaml /etc/netplan/ 2>/dev/null
+    netplan apply
+    echo -e "\e[31m[-] Rolled back. Your previous network settings have been restored.\e[0m"
 fi
