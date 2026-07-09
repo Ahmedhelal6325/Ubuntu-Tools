@@ -2,6 +2,7 @@
 #
 # ubuntu-static-ip.sh
 # Correct way to run this script (important):
+#   sudo bash -c "$(curl -fsSL https://tinyurl.com/ubuntu-static-ip)"
 #   sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ahmedhelal6325/Ubuntu-Tools/main/ubuntu-static-ip.sh)"
 #
 # Do NOT use the plain pipe form (curl | sudo bash). That consumes stdin
