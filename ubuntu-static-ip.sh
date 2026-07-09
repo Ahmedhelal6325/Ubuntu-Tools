@@ -161,34 +161,21 @@ EOF
 # otherwise it prints "Permissions too open" warnings.
 chmod 600 /etc/netplan/01-static-managed.yaml
 
-# 6. Apply the config, then confirm manually.
+# 6. Apply the config directly (no confirmation prompt).
 #
-# Note: we deliberately do NOT use "netplan try" here. Its own built-in
-# Enter-key confirmation does not reliably detect keypresses in every
-# terminal type (e.g. some VM consoles), which caused this script to
-# always roll back even after pressing Enter. Instead we apply the
-# config directly and use our own read prompt (which we already know
-# works fine in this script) as the safety confirmation.
+# Note: earlier versions asked for a y/N confirmation with a timeout as
+# a safety net, similar to "netplan try". That was removed on request:
+# it doesn't play well with SSH sessions (the prompt can get cut off
+# right when the interface changes), so this now just applies directly.
+# A backup of the previous config is kept at
+# /etc/netplan/backup_old_yaml/ in case you need to revert manually:
+#   sudo rm -f /etc/netplan/01-static-managed.yaml
+#   sudo mv /etc/netplan/backup_old_yaml/*.yaml /etc/netplan/
+#   sudo netplan apply
 echo -e "\n\e[32m[*] Applying the new network configuration...\e[0m"
 netplan apply
 sleep 2
 
 echo -e "\e[34mCurrent IP for $IFACE:\e[0m"
 ip addr show "$IFACE" | grep inet
-
-echo -e "\n\e[33m[Notice] If you can still reach this machine with the new IP (e.g. via SSH), confirm below.\e[0m"
-echo -e "\e[33m[Notice] If there is no response within 60 seconds, the previous network settings will be restored automatically.\e[0m"
-
-CONFIRM=""
-read -t 60 -r -p "Keep this configuration? [y/N]: " CONFIRM || true
-echo ""
-
-if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-    echo -e "\e[32m[OK] Configuration kept. Static IP setup complete.\e[0m"
-else
-    echo -e "\e[33m[*] Rolling back to the previous network configuration...\e[0m"
-    rm -f /etc/netplan/01-static-managed.yaml
-    mv /etc/netplan/backup_old_yaml/*.yaml /etc/netplan/ 2>/dev/null
-    netplan apply
-    echo -e "\e[31m[-] Rolled back. Your previous network settings have been restored.\e[0m"
-fi
+echo -e "\e[32m[OK] Static IP setup complete.\e[0m"
