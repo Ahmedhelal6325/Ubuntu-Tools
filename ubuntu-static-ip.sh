@@ -2,7 +2,7 @@
 #
 # ubuntu-static-ip.sh
 # Correct way to run this script (important):
-#   sudo bash -c "$(curl -fsSL https://tinyurl.com/ubuntu-static-ip)"
+# sudo bash -c "$(curl -fsSL https://tinyurl.com/ubuntu-static-ip)"
 #   sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ahmedhelal6325/Ubuntu-Tools/main/ubuntu-static-ip.sh)"
 #
 # Do NOT use the plain pipe form (curl | sudo bash). That consumes stdin
@@ -162,17 +162,26 @@ EOF
 # otherwise it prints "Permissions too open" warnings.
 chmod 600 /etc/netplan/01-static-managed.yaml
 
-# 6. Apply the config directly (no confirmation prompt).
-#
-# Note: earlier versions asked for a y/N confirmation with a timeout as
-# a safety net, similar to "netplan try". That was removed on request:
-# it doesn't play well with SSH sessions (the prompt can get cut off
-# right when the interface changes), so this now just applies directly.
-# A backup of the previous config is kept at
-# /etc/netplan/backup_old_yaml/ in case you need to revert manually:
-#   sudo rm -f /etc/netplan/01-static-managed.yaml
-#   sudo mv /etc/netplan/backup_old_yaml/*.yaml /etc/netplan/
-#   sudo netplan apply
+# 6. Preview the new config and confirm BEFORE touching the network.
+# This is much safer than confirming after applying: nothing has been
+# changed yet at this point, so if you say no, your current connection
+# (including SSH) is never affected.
+echo -e "\n\e[36m----------------------------------------------------\e[0m"
+echo -e "\e[36mNew netplan configuration to be applied:\e[0m"
+echo -e "\e[36m----------------------------------------------------\e[0m"
+cat /etc/netplan/01-static-managed.yaml
+echo -e "\e[36m----------------------------------------------------\e[0m"
+
+CONFIRM=""
+read -r -p "Apply this configuration now? [y/N]: " CONFIRM
+
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo -e "\e[33m[*] Aborted. No changes were made to your network.\e[0m"
+    rm -f /etc/netplan/01-static-managed.yaml
+    mv /etc/netplan/backup_old_yaml/*.yaml /etc/netplan/ 2>/dev/null
+    exit 0
+fi
+
 echo -e "\n\e[32m[*] Applying the new network configuration...\e[0m"
 netplan apply
 sleep 2
